@@ -15,8 +15,8 @@
 //! the joined stream)`; rectangles inside a form XObject carry the `Do` operator's position.
 //! Positions compare lexicographically in paint order.
 
-use pdfcraft_content::{Matrix, Op, Pieces, parse};
-use pdfcraft_cos::{DecodeBudget, Dict, Document, Object};
+use pov_content::{Matrix, Op, Pieces, parse};
+use pov_cos::{DecodeBudget, Dict, Document, Object};
 
 use crate::AuditError;
 

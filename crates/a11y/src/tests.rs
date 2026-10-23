@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use pdfcraft_cos::{Document, Object};
+use pov_cos::{Document, Object};
 
 use super::*;
 
@@ -62,7 +62,7 @@ fn autotag_text_writes_marked_content_and_parent_tree_across_pages() {
     assert_eq!(entries[2].as_int(), Some(1));
     assert_eq!(entries[1].as_array().unwrap().len(), 2);
     assert_eq!(entries[3].as_array().unwrap().len(), 1);
-    for page in pdfcraft_model::pages(&doc) {
+    for page in pov_model::pages(&doc) {
         let content = page.dict.get(b"Contents").unwrap();
         let stream = doc.resolve(content);
         let Object::Stream(stream) = &*stream else { panic!("marked page content") };
@@ -73,7 +73,7 @@ fn autotag_text_writes_marked_content_and_parent_tree_across_pages() {
     let report = check(&doc, &Options::default());
     assert_eq!(status(&report, Rule::TaggedPdf), Status::Passed);
     assert_eq!(status(&report, Rule::TaggedContent), Status::Passed);
-    let bytes = pdfcraft_cos::write_incremental(&doc, &pdfcraft_cos::SaveOptions::default()).unwrap();
+    let bytes = pov_cos::write_incremental(&doc, &pov_cos::SaveOptions::default()).unwrap();
     let reopened = Document::open(Arc::new(bytes)).unwrap();
     assert_eq!(tags(&reopened).len(), 4);
     assert_eq!(status(&check(&reopened, &Options::default()), Rule::TaggedContent), Status::Passed);
@@ -115,9 +115,9 @@ fn autotag_form_fields_writes_widget_structure_and_parent_tree() {
     assert_eq!(status(&report, Rule::TaggedFormFields), Status::Passed);
     let tree = doc.get(doc.root().unwrap()).as_dict().unwrap().reference(b"StructTreeRoot").unwrap();
     assert!(doc.get(tree).as_dict().unwrap().contains(b"ParentTree"));
-    let widget = pdfcraft_model::pages(&doc)[0].dict.get(b"Annots").and_then(|a| doc.resolve(a).as_array().cloned()).unwrap()[1].as_ref().unwrap();
+    let widget = pov_model::pages(&doc)[0].dict.get(b"Annots").and_then(|a| doc.resolve(a).as_array().cloned()).unwrap()[1].as_ref().unwrap();
     assert_eq!(doc.get(widget).as_dict().unwrap().get(b"StructParent").and_then(Object::as_int), Some(0));
-    let written = pdfcraft_cos::write_full(&doc, &pdfcraft_cos::SaveOptions::default()).unwrap();
+    let written = pov_cos::write_full(&doc, &pov_cos::SaveOptions::default()).unwrap();
     let reopened = Document::open(Arc::new(written)).unwrap();
     assert_eq!(status(&check(&reopened, &Options { rules: [Rule::TaggedFormFields].into(), pages: None }), Rule::TaggedFormFields), Status::Passed);
 }
@@ -159,11 +159,11 @@ fn autotag_form_fields_extends_a_direct_existing_structure_tree() {
         "",
     );
     assert_eq!(tag_form_fields(&mut doc).unwrap(), 1);
-    let widget = pdfcraft_model::pages(&doc)[0].dict.get(b"Annots").and_then(|a| doc.resolve(a).as_array().cloned()).unwrap()[0].as_ref().unwrap();
+    let widget = pov_model::pages(&doc)[0].dict.get(b"Annots").and_then(|a| doc.resolve(a).as_array().cloned()).unwrap()[0].as_ref().unwrap();
     assert_eq!(doc.get(widget).as_dict().unwrap().get(b"StructParent").and_then(Object::as_int), Some(1));
     let report = check(&doc, &Options { rules: [Rule::TaggedFormFields].into(), pages: None });
     assert_eq!(status(&report, Rule::TaggedFormFields), Status::Passed);
-    let document_object = doc.get(pdfcraft_cos::ObjRef::new(7, 0));
+    let document_object = doc.get(pov_cos::ObjRef::new(7, 0));
     let document = document_object.as_dict().unwrap();
     assert_eq!(document.get(b"K").and_then(Object::as_array).unwrap().len(), 2, "the existing paragraph and new form remain siblings");
 }
@@ -339,7 +339,7 @@ fn structure_doc(objects: &[String]) -> Document {
 fn reachable_tag_properties_round_trip_and_reject_unrelated_objects() {
     let mut doc =
         structure_doc(&["<< /S /Document /K [4 0 R] >>".into(), "<< /S /Figure /T (Old) /Alt (A chart) >>".into(), "<< /S /Figure >>".into()]);
-    let tag = pdfcraft_cos::ObjRef::new(4, 0);
+    let tag = pov_cos::ObjRef::new(4, 0);
     let listed = tags(&doc);
     assert_eq!(listed.len(), 2);
     assert_eq!(listed[1].object, tag);
@@ -363,8 +363,8 @@ fn reachable_tag_properties_round_trip_and_reject_unrelated_objects() {
     assert_eq!(tags(&doc)[1].title, None);
     assert!(matches!(set_tag_property(&mut doc, tag, TagProperty::Type, None), Err(TagError::InvalidType)));
     assert!(matches!(set_tag_property(&mut doc, tag, TagProperty::Type, Some("bad type")), Err(TagError::InvalidType)));
-    assert!(matches!(set_tag_property(&mut doc, pdfcraft_cos::ObjRef::new(5, 0), TagProperty::Title, Some("No")), Err(TagError::NotATag(_))));
-    assert!(matches!(set_tag_property(&mut doc, pdfcraft_cos::ObjRef::new(4, 1), TagProperty::Title, Some("No")), Err(TagError::NotATag(_))));
+    assert!(matches!(set_tag_property(&mut doc, pov_cos::ObjRef::new(5, 0), TagProperty::Title, Some("No")), Err(TagError::NotATag(_))));
+    assert!(matches!(set_tag_property(&mut doc, pov_cos::ObjRef::new(4, 1), TagProperty::Title, Some("No")), Err(TagError::NotATag(_))));
 }
 
 #[test]
@@ -674,7 +674,7 @@ fn character_encoding_rejects_unknown_cmaps_and_foreign_collections() {
 
 #[test]
 fn character_encoding_resolves_indirect_cid_metadata() {
-    use pdfcraft_cos::{Dict, ObjRef, PdfString};
+    use pov_cos::{Dict, ObjRef, PdfString};
     let mut doc = cid_encoding_pdf("/Identity-H", "null", false);
     let registry = doc.add(Object::String(PdfString::literal(b"Adobe".to_vec())));
     let ordering = doc.add(Object::String(PdfString::literal(b"Japan1".to_vec())));
@@ -771,37 +771,37 @@ fn sibling_tags_move_in_reading_order_without_changing_content() {
     let mut doc = figures_doc();
     let before: Vec<_> = tags(&doc).into_iter().map(|tag| tag.object.num).collect();
     assert_eq!(before, [6, 7, 8]);
-    let content = doc.get(pdfcraft_cos::ObjRef::new(4, 0));
-    move_tag(&mut doc, pdfcraft_cos::ObjRef::new(8, 0), pdfcraft_cos::ObjRef::new(7, 0), TagPlacement::Before).unwrap();
+    let content = doc.get(pov_cos::ObjRef::new(4, 0));
+    move_tag(&mut doc, pov_cos::ObjRef::new(8, 0), pov_cos::ObjRef::new(7, 0), TagPlacement::Before).unwrap();
     assert_eq!(tags(&doc).into_iter().map(|tag| tag.object.num).collect::<Vec<_>>(), [6, 8, 7]);
-    assert_eq!(doc.get(pdfcraft_cos::ObjRef::new(4, 0)), content, "page content stays unchanged");
+    assert_eq!(doc.get(pov_cos::ObjRef::new(4, 0)), content, "page content stays unchanged");
     assert_eq!(
-        move_tag(&mut doc, pdfcraft_cos::ObjRef::new(8, 0), pdfcraft_cos::ObjRef::new(7, 0), TagPlacement::Before),
+        move_tag(&mut doc, pov_cos::ObjRef::new(8, 0), pov_cos::ObjRef::new(7, 0), TagPlacement::Before),
         Err(TagError::AlreadyThere)
     );
-    move_tag(&mut doc, pdfcraft_cos::ObjRef::new(8, 0), pdfcraft_cos::ObjRef::new(7, 0), TagPlacement::After).unwrap();
+    move_tag(&mut doc, pov_cos::ObjRef::new(8, 0), pov_cos::ObjRef::new(7, 0), TagPlacement::After).unwrap();
     assert_eq!(tags(&doc).into_iter().map(|tag| tag.object.num).collect::<Vec<_>>(), [6, 7, 8]);
     assert_eq!(
-        move_tag(&mut doc, pdfcraft_cos::ObjRef::new(8, 0), pdfcraft_cos::ObjRef::new(6, 0), TagPlacement::Before),
+        move_tag(&mut doc, pov_cos::ObjRef::new(8, 0), pov_cos::ObjRef::new(6, 0), TagPlacement::Before),
         Err(TagError::NotSiblings)
     );
     assert_eq!(
-        move_tag(&mut doc, pdfcraft_cos::ObjRef::new(8, 1), pdfcraft_cos::ObjRef::new(7, 0), TagPlacement::Before),
+        move_tag(&mut doc, pov_cos::ObjRef::new(8, 1), pov_cos::ObjRef::new(7, 0), TagPlacement::Before),
         Err(TagError::NotSiblings)
     );
-    doc.update_dict(pdfcraft_cos::ObjRef::new(6, 0), |d| {
+    doc.update_dict(pov_cos::ObjRef::new(6, 0), |d| {
         d.set(
             b"K".to_vec(),
-            pdfcraft_cos::Object::Array(vec![
-                pdfcraft_cos::Object::Ref(pdfcraft_cos::ObjRef::new(7, 0)),
-                pdfcraft_cos::Object::Ref(pdfcraft_cos::ObjRef::new(8, 0)),
-                pdfcraft_cos::Object::Ref(pdfcraft_cos::ObjRef::new(7, 0)),
+            pov_cos::Object::Array(vec![
+                pov_cos::Object::Ref(pov_cos::ObjRef::new(7, 0)),
+                pov_cos::Object::Ref(pov_cos::ObjRef::new(8, 0)),
+                pov_cos::Object::Ref(pov_cos::ObjRef::new(7, 0)),
             ]),
         );
     })
     .unwrap();
     assert_eq!(
-        move_tag(&mut doc, pdfcraft_cos::ObjRef::new(8, 0), pdfcraft_cos::ObjRef::new(7, 0), TagPlacement::After),
+        move_tag(&mut doc, pov_cos::ObjRef::new(8, 0), pov_cos::ObjRef::new(7, 0), TagPlacement::After),
         Err(TagError::AmbiguousChildren)
     );
 }
@@ -816,7 +816,7 @@ fn setting_alt_text_and_marking_decorative() {
     assert_eq!(r.result(Rule::FiguresAltText).unwrap().status, Status::Passed);
     set_alt(&mut doc, f[0].obj, None).unwrap();
     assert_eq!(figures(&doc)[0].alt, None);
-    assert_eq!(set_alt(&mut doc, pdfcraft_cos::ObjRef::new(6, 0), Some("x")), Err(AltError::NotAFigure(6)));
+    assert_eq!(set_alt(&mut doc, pov_cos::ObjRef::new(6, 0), Some("x")), Err(AltError::NotAFigure(6)));
     // Decorative: the figure leaves the tags and its content becomes an artifact.
     mark_decorative(&mut doc, f[0].obj).unwrap();
     let left = figures(&doc);
@@ -824,9 +824,9 @@ fn setting_alt_text_and_marking_decorative() {
     assert_eq!(left[0].alt.as_deref(), Some("A bar"));
     let r = check(&doc, &Options { rules: [Rule::FiguresAltText, Rule::TaggedContent].into(), pages: None });
     assert_eq!(failed(&r), Vec::<Rule>::new(), "{:?}", r.results);
-    let pages = pdfcraft_model::pages(&doc);
+    let pages = pov_model::pages(&doc);
     let c = doc.resolve(pages[0].dict.get(b"Contents").unwrap());
-    let pdfcraft_cos::Object::Stream(c) = &*c else { panic!("one content stream") };
+    let pov_cos::Object::Stream(c) = &*c else { panic!("one content stream") };
     let text = String::from_utf8(c.decoded().unwrap()).unwrap();
     assert!(text.contains("/Artifact BMC") && !text.contains("/MCID 0"), "{text}");
 }
@@ -834,27 +834,27 @@ fn setting_alt_text_and_marking_decorative() {
 #[test]
 fn marking_a_leaf_tag_as_an_artifact_preserves_appearance_and_structure_integrity() {
     let mut doc = figures_doc();
-    let page = pdfcraft_model::pages(&doc)[0].obj;
-    mark_tag_artifact(&mut doc, pdfcraft_cos::ObjRef::new(7, 0)).unwrap();
+    let page = pov_model::pages(&doc)[0].obj;
+    mark_tag_artifact(&mut doc, pov_cos::ObjRef::new(7, 0)).unwrap();
     assert_eq!(tags(&doc).into_iter().map(|tag| tag.object.num).collect::<Vec<_>>(), [6, 8]);
     let c = doc.resolve(doc.get(page).as_dict().unwrap().get(b"Contents").unwrap());
-    let pdfcraft_cos::Object::Stream(c) = &*c else { panic!("one content stream") };
+    let pov_cos::Object::Stream(c) = &*c else { panic!("one content stream") };
     let text = String::from_utf8(c.decoded().unwrap()).unwrap();
     assert!(text.contains("/Artifact BMC") && !text.contains("/MCID 0"), "{text}");
     let report = check(&doc, &Options { rules: [Rule::TaggedContent, Rule::FiguresAltText].into(), pages: None });
     assert_eq!(failed(&report), Vec::<Rule>::new(), "{:?}", report.results);
-    assert_eq!(mark_tag_artifact(&mut doc, pdfcraft_cos::ObjRef::new(6, 0)), Err(ArtifactError::HasChildren));
-    assert_eq!(mark_tag_artifact(&mut doc, pdfcraft_cos::ObjRef::new(7, 0)), Err(ArtifactError::NotATag(7)));
+    assert_eq!(mark_tag_artifact(&mut doc, pov_cos::ObjRef::new(6, 0)), Err(ArtifactError::HasChildren));
+    assert_eq!(mark_tag_artifact(&mut doc, pov_cos::ObjRef::new(7, 0)), Err(ArtifactError::NotATag(7)));
 }
 
 #[test]
 fn marking_decorative_survives_a_parent_tree_with_an_unpaired_key() {
     // A trailing key without a value, matching the page's StructParents (#1809), and the same
     // with no valid pair at all.
-    let tree = |nums: &str| pdf(&[format!("<< /Nums {nums} >>")], "").get(pdfcraft_cos::ObjRef::new(1, 0)).as_ref().clone();
+    let tree = |nums: &str| pdf(&[format!("<< /Nums {nums} >>")], "").get(pov_cos::ObjRef::new(1, 0)).as_ref().clone();
     for (nums, cleared) in [("[0 [7 0 R 8 0 R] 0]", "[0 [null 8 0 R] 0]"), ("[0]", "[0]")] {
         let mut doc = figures_doc();
-        let pt = pdfcraft_cos::ObjRef::new(9, 0);
+        let pt = pov_cos::ObjRef::new(9, 0);
         doc.set(pt, tree(nums));
         let f = figures(&doc);
         mark_decorative(&mut doc, f[0].obj).unwrap();
@@ -897,31 +897,31 @@ fn named_property_lists_are_found_and_marked_decorative_like_inline_ones() {
     let place = |doc: &Document| figures(doc).into_iter().map(|f| (f.obj, f.page, f.alt, f.bbox)).collect::<Vec<_>>();
     assert_eq!(place(&named), place(&inline), "both figures, placed where their content is drawn");
     for doc in [&mut inline, &mut named] {
-        mark_decorative(doc, pdfcraft_cos::ObjRef::new(8, 0)).unwrap();
+        mark_decorative(doc, pov_cos::ObjRef::new(8, 0)).unwrap();
         let left = figures(doc);
         assert_eq!((left.len(), left[0].obj.num, left[0].bbox), (1, 7, Some([10.0, 150.0, 50.0, 170.0])));
-        let pages = pdfcraft_model::pages(doc);
+        let pages = pov_model::pages(doc);
         let c = doc.resolve(pages[0].dict.get(b"Contents").unwrap());
         let Object::Stream(c) = &*c else { panic!("one content stream") };
         let text = String::from_utf8(c.decoded().unwrap()).unwrap();
         assert!(text.contains("/Artifact BMC") && !text.contains("/P1") && !text.contains("/MCID 1"), "{text}");
         assert!(text.contains("/Im Do"), "the drawing itself stays: {text}");
-        let nums = doc.get(pdfcraft_cos::ObjRef::new(9, 0)).as_dict().and_then(|d| d.get(b"Nums").cloned());
+        let nums = doc.get(pov_cos::ObjRef::new(9, 0)).as_dict().and_then(|d| d.get(b"Nums").cloned());
         assert_eq!(
             nums,
-            Some(Object::Array(vec![Object::Int(0), Object::Array(vec![Object::Ref(pdfcraft_cos::ObjRef::new(7, 0)), Object::Null])])),
+            Some(Object::Array(vec![Object::Int(0), Object::Array(vec![Object::Ref(pov_cos::ObjRef::new(7, 0)), Object::Null])])),
             "the parent tree no longer points MCID 1 at the removed figure"
         );
         let r = check(doc, &Options { rules: [Rule::FiguresAltText, Rule::TaggedContent].into(), pages: None });
         assert_eq!(r.result(Rule::TaggedContent).unwrap().status, Status::Passed, "{:?}", r.results);
     }
-    let props = pdfcraft_model::pages(&named)[0].dict.get(b"Resources").and_then(|r| named.resolve(r).as_dict().cloned());
+    let props = pov_model::pages(&named)[0].dict.get(b"Resources").and_then(|r| named.resolve(r).as_dict().cloned());
     let props = props.and_then(|r| r.get(b"Properties").and_then(|p| named.resolve(p).as_dict().cloned())).unwrap();
     assert!(props.contains(b"P0") && props.contains(b"P1") && props.contains(b"Other"), "resources are left as they were");
 }
 
-fn ref_(n: u32) -> Option<pdfcraft_cos::ObjRef> {
-    Some(pdfcraft_cos::ObjRef::new(n, 0))
+fn ref_(n: u32) -> Option<pov_cos::ObjRef> {
+    Some(pov_cos::ObjRef::new(n, 0))
 }
 
 /// Two tagged pages: role-mapped and nested headings, actual text, a ToUnicode font, a heading
@@ -1031,8 +1031,8 @@ fn mark_reads(f: impl FnOnce()) -> usize {
 }
 
 /// Page content nesting `depth` unmarked `BMC` blocks around a marked one, with `ops` operators inside.
-fn deeply_nested_page(doc: &mut Document, depth: usize, ops: usize) -> pdfcraft_cos::Dict {
-    use pdfcraft_cos::{Dict, Stream};
+fn deeply_nested_page(doc: &mut Document, depth: usize, ops: usize) -> pov_cos::Dict {
+    use pov_cos::{Dict, Stream};
     let mut data = "/Figure << /MCID 0 >> BDC ".to_string();
     data.push_str(&"/X BMC ".repeat(depth));
     data.push_str(&"0 0 1 1 re f ".repeat(ops));
@@ -1255,7 +1255,7 @@ fn horizontally_scaled_wrapped_heading_keeps_a_space_between_lines() {
 
 #[test]
 fn repeated_content_references_share_one_decode_budget() {
-    use pdfcraft_cos::{Dict, MAX_PAGE_DECODED, Object, Stream};
+    use pov_cos::{Dict, MAX_PAGE_DECODED, Object, Stream};
     let mut doc = Document::new_empty();
     let stream = doc.add(Stream::flate(Dict::new(), &vec![b' '; 1 << 20]));
     let page: Dict = [(b"Contents".to_vec(), Object::Array(vec![Object::Ref(stream); 300]))].into_iter().collect();
@@ -1267,7 +1267,7 @@ fn repeated_content_references_share_one_decode_budget() {
 /// not removed with that content still pointing at it.
 #[test]
 fn marking_decorative_refuses_content_past_the_decode_budget() {
-    use pdfcraft_cos::{Dict, ObjRef, Object, Stream};
+    use pov_cos::{Dict, ObjRef, Object, Stream};
     let mut doc = figures_doc();
     let filler = doc.add(Stream::flate(Dict::new(), &vec![b' '; 1 << 20]));
     let last = doc.add(Stream::from_raw(Dict::new(), b"/Figure << /MCID 0 >> BDC 0 0 5 5 re f EMC".to_vec()));
@@ -1283,7 +1283,7 @@ fn marking_decorative_refuses_content_past_the_decode_budget() {
 /// can't be called image-only, nor its content all tagged.
 #[test]
 fn content_past_the_decode_budget_needs_a_manual_check() {
-    use pdfcraft_cos::{Dict, ObjRef, Object, Stream};
+    use pov_cos::{Dict, ObjRef, Object, Stream};
     let mut doc = pdf(
         &[
             "<< /Type /Catalog /Pages 2 0 R >>".into(),
@@ -1312,7 +1312,7 @@ fn content_past_the_decode_budget_needs_a_manual_check() {
 /// the page's decode budget is refused rather than dropped from the page.
 #[test]
 fn marking_a_tag_artifact_refuses_content_past_the_decode_budget() {
-    use pdfcraft_cos::{Dict, ObjRef, Object, Stream};
+    use pov_cos::{Dict, ObjRef, Object, Stream};
     let mut doc = figures_doc();
     let filler = doc.add(Stream::flate(Dict::new(), &vec![b' '; 1 << 20]));
     let last = doc.add(Stream::from_raw(Dict::new(), b"0 0 5 5 re f".to_vec()));

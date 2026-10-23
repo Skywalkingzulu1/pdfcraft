@@ -10,8 +10,8 @@
 
 use std::collections::{HashMap, HashSet};
 
-use pdfcraft_cos::{Dict, Document, ObjRef, Object, PdfString, Stream};
-use pdfcraft_fonts::{
+use pov_cos::{Dict, Document, ObjRef, Object, PdfString, Stream};
+use pov_fonts::{
     GlyphError, GlyphOutline, ShapedCluster, ShapedScript, Std14, literal, shape_arabic, shape_hebrew, shape_thai, shaped_glyph, win_ansi,
 };
 use unicode_bidi::{Level, ParagraphBidiInfo};
@@ -154,8 +154,8 @@ impl AddedImage {
 
     /// The matrix from image space (the unit square) to display space: crop, flip, rotate,
     /// then fill the box.
-    fn matrix(&self) -> pdfcraft_content::Matrix {
-        use pdfcraft_content::Matrix as M;
+    fn matrix(&self) -> pov_content::Matrix {
+        use pov_content::Matrix as M;
         let [l, b, r, t] = self.crop.map(|v| v.clamp(0.0, 0.45));
         let (cw, ch) = ((1.0 - l - r).max(0.05), (1.0 - b - t).max(0.05));
         let mut m = M([1.0 / cw, 0.0, 0.0, 1.0 / ch, -l / cw, -b / ch]);
@@ -215,7 +215,7 @@ pub struct Added {
     pub content: Content,
 }
 
-/// PdfCraft-owned page content discovered in one page/content traversal.
+/// POV-owned page content discovered in one page/content traversal.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct MarkerScan {
     pub marks: Vec<MarkKind>,
@@ -336,7 +336,7 @@ fn is_hebrew(c: char) -> bool {
 /// keeps it open.
 pub fn first_undrawable(t: &AddedText) -> Option<char> {
     if t.text.chars().any(is_thai) {
-        if let Some(c) = t.text.chars().find(|c| is_thai(*c) && !pdfcraft_fonts::thai_has(*c)) {
+        if let Some(c) = t.text.chars().find(|c| is_thai(*c) && !pov_fonts::thai_has(*c)) {
             return Some(c);
         }
         let rest = AddedText { text: t.text.chars().filter(|c| !is_thai(*c)).collect(), ..t.clone() };
@@ -344,20 +344,20 @@ pub fn first_undrawable(t: &AddedText) -> Option<char> {
     }
     // Arabic or Hebrew that nothing can draw: there's no face, or the face lacks it.
     if let Some(c) =
-        t.text.chars().find(|c| (shaped_arabic(*c) && !pdfcraft_fonts::arabic_has(*c)) || (is_hebrew(*c) && !pdfcraft_fonts::hebrew_has(*c)))
+        t.text.chars().find(|c| (shaped_arabic(*c) && !pov_fonts::arabic_has(*c)) || (is_hebrew(*c) && !pov_fonts::hebrew_has(*c)))
     {
         return Some(c);
     }
     if !shaped_by_a_face(t) {
         // Drawn line by line in the item's standard font (`\n` splits lines). Without the face
         // that is also how `draw` redraws an existing item, so it's checked that way.
-        return t.text.split('\n').find_map(pdfcraft_fonts::first_non_win_ansi);
+        return t.text.split('\n').find_map(pov_fonts::first_non_win_ansi);
     }
     // What `shaped_layout` leaves to the standard font, exactly as `draw_shaped` splits it.
     wrapped(t).into_iter().find_map(|(line, rtl)| {
         let (pieces, _) = shaped_layout(t, &line, rtl).ok()?;
         pieces.iter().find_map(|p| match p {
-            Piece::Latin(s) => pdfcraft_fonts::first_non_win_ansi(s),
+            Piece::Latin(s) => pov_fonts::first_non_win_ansi(s),
             Piece::Shaped(_) => None,
         })
     })
@@ -366,8 +366,8 @@ pub fn first_undrawable(t: &AddedText) -> Option<char> {
 /// Whether `t` has Arabic or Hebrew that its craft-fonts face draws (so `draw` lays it out with
 /// [`draw_shaped`]).
 fn shaped_by_a_face(t: &AddedText) -> bool {
-    (pdfcraft_fonts::document_arabic_font().is_some() && t.text.chars().any(is_arabic))
-        || (pdfcraft_fonts::document_hebrew_font(false).is_some() && t.text.chars().any(is_hebrew))
+    (pov_fonts::document_arabic_font().is_some() && t.text.chars().any(is_arabic))
+        || (pov_fonts::document_hebrew_font(false).is_some() && t.text.chars().any(is_hebrew))
 }
 
 /// An Arabic character the face shapes and draws (U+061C, a direction mark, is dropped).
@@ -426,9 +426,9 @@ fn shaped_layout(t: &AddedText, line: &str, rtl: bool) -> Result<(Vec<Piece>, f6
             let after_hebrew = segments.last().is_some_and(|(kind, _)| *kind == Some(ShapedScript::Hebrew));
             let script = if is_thai(c) {
                 Some(ShapedScript::Thai)
-            } else if is_hebrew(c) || (run_rtl && after_hebrew && !c.is_alphanumeric() && pdfcraft_fonts::hebrew_has(c)) {
+            } else if is_hebrew(c) || (run_rtl && after_hebrew && !c.is_alphanumeric() && pov_fonts::hebrew_has(c)) {
                 Some(ShapedScript::Hebrew)
-            } else if is_arabic(c) || (run_rtl && !c.is_alphanumeric() && pdfcraft_fonts::arabic_has(c)) {
+            } else if is_arabic(c) || (run_rtl && !c.is_alphanumeric() && pov_fonts::arabic_has(c)) {
                 Some(ShapedScript::Arabic)
             } else {
                 None
@@ -474,7 +474,7 @@ fn shaped_width(t: &AddedText, s: &str, rtl: bool) -> f64 {
 
 fn arabic_error(e: GlyphError, text: &str) -> EditError {
     EditError::Invalid(match e {
-        GlyphError::NoFont => "Arabic text needs PdfCraft's Arabic font, which this build doesn't include \
+        GlyphError::NoFont => "Arabic text needs POV's Arabic font, which this build doesn't include \
                                (to build it in, set CRAFT_FONTS_DIR to a craft-fonts checkout that has an Arab face)"
             .into(),
         GlyphError::Missing => format!("the Arabic font can't show \"{text}\""),
@@ -484,7 +484,7 @@ fn arabic_error(e: GlyphError, text: &str) -> EditError {
 
 fn hebrew_error(e: GlyphError, text: &str) -> EditError {
     EditError::Invalid(match e {
-        GlyphError::NoFont => "Hebrew text needs PdfCraft's Hebrew font, which this build doesn't include \
+        GlyphError::NoFont => "Hebrew text needs POV's Hebrew font, which this build doesn't include \
                                (to build it in, set CRAFT_FONTS_DIR to a craft-fonts checkout that has a Hebr face)"
             .into(),
         GlyphError::Missing => format!("the Hebrew font can't show \"{text}\""),
@@ -716,7 +716,7 @@ fn type3_shaped(doc: &mut Document, clusters: &[&ShapedCluster], outlines: &Hash
             },
             |f| f.family,
         ),
-        None => "PdfCraft Shaped Text",
+        None => "POV Shaped Text",
     };
     let mut descriptor = Dict::new();
     descriptor.set(b"Type".to_vec(), Object::name("FontDescriptor"));
@@ -776,8 +776,8 @@ fn draw(doc: &mut Document, c: &Content, view: [f64; 6], taken: &Dict, existing:
             fonts.set(name.clone().into_bytes(), Object::Dict(font));
             let face_or_new = |has: fn(char) -> bool, face: bool| t.text.chars().any(has) && (face || !existing);
             if t.text.chars().any(is_thai)
-                || face_or_new(is_arabic, pdfcraft_fonts::document_arabic_font().is_some())
-                || face_or_new(is_hebrew, pdfcraft_fonts::document_hebrew_font(false).is_some())
+                || face_or_new(is_arabic, pov_fonts::document_arabic_font().is_some())
+                || face_or_new(is_hebrew, pov_fonts::document_hebrew_font(false).is_some())
             {
                 draw_shaped(doc, t, taken, &mut fonts, &mut out)?;
                 res.set(b"Font".to_vec(), Object::Dict(fonts));
@@ -931,7 +931,7 @@ fn with_resolved<T>(doc: &Document, object: &Object, f: impl FnOnce(&Object) -> 
     }
 }
 
-fn for_each_content_entry(doc: &Document, page: &pdfcraft_model::Page, mut visit: impl FnMut(&Object)) {
+fn for_each_content_entry(doc: &Document, page: &pov_model::Page, mut visit: impl FnMut(&Object)) {
     let Some(contents) = page.dict.get(b"Contents") else { return };
     with_resolved(doc, contents, |resolved| match resolved {
         Object::Array(entries) => {
@@ -981,7 +981,7 @@ pub fn scan_markers(doc: &Document) -> MarkerScan {
                             .get(b"UserUnit")
                             .and_then(Object::as_f64)
                             .filter(|u| u.is_finite() && *u >= 1.0)
-                            .map_or(1.0, |u| u.min(pdfcraft_model::MAX_USER_UNIT));
+                            .map_or(1.0, |u| u.min(pov_model::MAX_USER_UNIT));
                         scan.added.push(Added { page: pi, obj, content: content.scaled(page.user_unit(doc) / written) });
                     }
                 });
@@ -1007,16 +1007,16 @@ fn validate(c: &Content) -> Result<(), EditError> {
             if (r[2] - r[0]).abs() < 1.0 {
                 return Err(EditError::Invalid("the text box is too narrow".into()));
             }
-            if t.text.chars().any(is_thai) && pdfcraft_fonts::document_thai_font().is_none() {
+            if t.text.chars().any(is_thai) && pov_fonts::document_thai_font().is_none() {
                 return Err(thai_error(GlyphError::NoFont, &t.text));
             }
             // Without the Arabic face, `draw` decides for the Arabic letters themselves (#403): a new
             // item is refused with what's missing, and one that already holds Arabic stays movable.
             // Everything else in it is drawn in the standard font, so it still has to fit.
-            let undrawable = if t.text.chars().any(shaped_arabic) && pdfcraft_fonts::document_arabic_font().is_none() {
+            let undrawable = if t.text.chars().any(shaped_arabic) && pov_fonts::document_arabic_font().is_none() {
                 t.text.split('\n').find_map(|line| {
                     line.chars()
-                        .find(|c| !(shaped_arabic(*c) || is_thai(*c) && pdfcraft_fonts::thai_has(*c) || pdfcraft_fonts::win_ansi_encodable(*c)))
+                        .find(|c| !(shaped_arabic(*c) || is_thai(*c) && pov_fonts::thai_has(*c) || pov_fonts::win_ansi_encodable(*c)))
                 })
             } else {
                 first_undrawable(t)

@@ -1,6 +1,6 @@
-# pdfcraft-fonts
+# pov-fonts
 
-Layer L2. Font helpers for the appearance streams PdfCraft generates (comments, form fields).
+Layer L2. Font helpers for the appearance streams POV generates (comments, form fields).
 
 Today it holds what generated appearances need without a font program:
 

@@ -14,7 +14,7 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
-use pdfcraft_cos::{Dict, Document, ObjRef, Object, PdfString, SaveOptions, Stream};
+use pov_cos::{Dict, Document, ObjRef, Object, PdfString, SaveOptions, Stream};
 
 use crate::SignError;
 use crate::cms::SignedData;
@@ -48,7 +48,7 @@ pub struct DigestCache {
 /// a Document, its bytes, or parsed signature dictionaries across edits and saves.
 #[derive(Debug)]
 struct TimestampCandidates {
-    source: pdfcraft_cos::SourceIdentity,
+    source: pov_cos::SourceIdentity,
     modified: Vec<u32>,
     candidates: Vec<ObjRef>,
 }
@@ -67,7 +67,7 @@ fn changed_timestamp_candidates(doc: &Document, numbers: &[u32]) -> Option<Vec<O
     for (reference, object) in doc.scan_original_objects_subset(numbers.to_vec()) {
         match object.ok()?.as_ref() {
             Object::Dict(_) => {}
-            Object::Null if matches!(doc.xref_entry(reference.num), None | Some(pdfcraft_cos::XrefEntry::Free { .. })) => {}
+            Object::Null if matches!(doc.xref_entry(reference.num), None | Some(pov_cos::XrefEntry::Free { .. })) => {}
             _ => return None,
         }
     }
@@ -344,7 +344,7 @@ pub const WORDINGS: &[&str] = &[
     "The signature's byte range does not exclude exactly its contents.",
     "The signature contents are not hexadecimal.",
     "The signature could not be read ({}).",
-    "PdfCraft can't check this signature yet: {}.",
+    "POV can't check this signature yet: {}.",
     "The signature uses the legacy adbe.x509.rsa_sha1 format.",
     // What was read leniently on the way, each sentence worded where the reading happens.
     "The signature is BER-encoded (indefinite lengths) rather than DER; it was read leniently.",
@@ -375,10 +375,10 @@ pub const WORDINGS: &[&str] = &[
     "The signer's certificate was not valid at the time of signing.",
     "The signer's certificate does not allow digital signatures (its key usage has neither digital signature nor non-repudiation).",
     "The signer's certificate is not issued for signing documents (its extended key usage has no document-signing purpose).",
-    "The signer's certificate has critical extensions PdfCraft does not recognize ({}).",
+    "The signer's certificate has critical extensions POV does not recognize ({}).",
     // Why a certificate that matched the issuer was not used to build the chain.
     "The certificate of {} is not a CA certificate that may issue certificates, so it is not used to vouch for {}.",
-    "The certificate of {} has critical extensions PdfCraft does not recognize, so it is not used to vouch for {}.",
+    "The certificate of {} has critical extensions POV does not recognize, so it is not used to vouch for {}.",
     "The certificate of {} does not allow this many CA certificates below it (path length), so it is not used to vouch for {}.",
     "The certificate of {} was not valid at the time of signing, so it is not used to vouch for {}.",
     "The signer's identity is unknown because it has not been included in your list of trusted certificates and none of its parent certificates are trusted certificates.",
@@ -552,7 +552,7 @@ fn sig_fields(doc: &Document) -> Vec<Field> {
 /// Which page holds each annotation.
 fn annot_pages(doc: &Document) -> HashMap<ObjRef, usize> {
     let mut map = HashMap::new();
-    for (i, p) in pdfcraft_annot::page_refs(doc).unwrap_or_default().into_iter().enumerate() {
+    for (i, p) in pov_annot::page_refs(doc).unwrap_or_default().into_iter().enumerate() {
         if let Some(a) = doc.get(p).as_dict().and_then(|d| d.get(b"Annots").map(|a| doc.resolve(a))).and_then(|a| a.as_array().cloned()) {
             for r in a.iter().filter_map(Object::as_ref) {
                 map.insert(r, i);
@@ -666,7 +666,7 @@ pub fn list_cached(doc: &Document, bytes: &[u8], trust: &TrustStore, cache: &Dig
 }
 
 fn page_index(doc: &Document, p: ObjRef) -> Option<usize> {
-    pdfcraft_annot::page_refs(doc).ok()?.iter().position(|r| *r == p)
+    pov_annot::page_refs(doc).ok()?.iter().position(|r| *r == p)
 }
 
 /// Validate one signature dictionary.
@@ -743,7 +743,7 @@ fn validate_into(doc: &Document, bytes: &[u8], trust: &TrustStore, v: &Dict, inf
     let unsupported = |info: &mut SignatureInfo, why: &str| {
         info.status = Status::Unknown;
         // What is not supported yet is named by the reader, in its own words.
-        info.details.push(Detail::of("PdfCraft can't check this signature yet: {}.", Fill::Reason(why.to_owned())));
+        info.details.push(Detail::of("POV can't check this signature yet: {}.", Fill::Reason(why.to_owned())));
     };
     if info.sub_filter.as_deref() == Some("adbe.x509.rsa_sha1") {
         return validate_x509_rsa_sha1(doc, bytes, trust, v, info, cache, (l0, o1, covered), &contents);
@@ -1111,7 +1111,7 @@ fn check_dss_revocation(doc: &Document, signer: Option<&Certificate>, at: &Optio
         None if cut => {
             info.details.push(Detail::of(
                 "The signature could not be checked ({}).",
-                Fill::Reason("the /DSS holds more revocation evidence than PdfCraft reads".into()),
+                Fill::Reason("the /DSS holds more revocation evidence than POV reads".into()),
             ));
             DssRevocation::Incomplete
         }
@@ -1294,13 +1294,13 @@ fn validate_x509_rsa_sha1(
             info.certificate = Some(cert);
             return fail(info, Detail::plain("The document has been altered or corrupted since the signature was applied."));
         }
-        // Only what PdfCraft doesn't support yet is "can't check"; a key or value that is
+        // Only what POV doesn't support yet is "can't check"; a key or value that is
         // malformed is a signature that doesn't verify (as on the CMS path).
         Err(SignError::Unsupported(e)) => {
             info.certificate = Some(cert);
             info.status = Status::Unknown;
             // What is not supported yet is named by the reader, in its own words.
-            info.details.push(Detail::of("PdfCraft can't check this signature yet: {}.", Fill::Reason(e.to_string())));
+            info.details.push(Detail::of("POV can't check this signature yet: {}.", Fill::Reason(e.to_string())));
             return;
         }
         Err(e) => {
@@ -1319,7 +1319,7 @@ fn classify_changes(doc: &Document, old: Option<Document>, p: Option<u8>) -> Mod
     let Some(old) = old else {
         return Modification::Disallowed(vec![kind::UNREADABLE]);
     };
-    let old_content: HashSet<ObjRef> = pdfcraft_annot::page_refs(&old)
+    let old_content: HashSet<ObjRef> = pov_annot::page_refs(&old)
         .unwrap_or_default()
         .into_iter()
         .flat_map(|pg| {
@@ -1342,7 +1342,7 @@ fn classify_changes(doc: &Document, old: Option<Document>, p: Option<u8>) -> Mod
     // object is judged by the role it held when signed, never by the labels or keys its new,
     // attacker-written version carries (relabelling a signed page /Type /Sig, or dropping its
     // /Type and adding /ModDate, must not reclassify it away from page content).
-    let signed_pages: HashSet<ObjRef> = pdfcraft_annot::page_refs(&old).unwrap_or_default().into_iter().collect();
+    let signed_pages: HashSet<ObjRef> = pov_annot::page_refs(&old).unwrap_or_default().into_iter().collect();
     // What each signed page draws from, by the role it held when signed (#1787).
     let signed_resources = signed_page_resources(&old, &signed_pages);
     let old_info = old.trailer().get(b"Info").and_then(Object::as_ref);
@@ -1350,7 +1350,7 @@ fn classify_changes(doc: &Document, old: Option<Document>, p: Option<u8>) -> Mod
     let dss = dss_parts(doc, &old);
     // Stored at the same place in both (and not edited since): the same bytes, unchanged.
     let same_place = |num: u32| -> bool {
-        use pdfcraft_cos::XrefEntry;
+        use pov_cos::XrefEntry;
         if doc.is_edited(num) {
             return false;
         }
@@ -1886,7 +1886,7 @@ impl AppearanceLabels {
     /// can't draw, and that character. Signing refuses such a label when it is shown, so an
     /// interface checks its translated labels here and falls back to [`Default`] if one fails.
     pub fn first_undrawable(&self) -> Option<(&'static str, char)> {
-        self.fields().into_iter().find_map(|(field, text)| pdfcraft_fonts::first_undrawable(text).map(|c| (field, c)))
+        self.fields().into_iter().find_map(|(field, text)| pov_fonts::first_undrawable(text).map(|c| (field, c)))
     }
 }
 
@@ -1917,7 +1917,7 @@ pub struct SignOptions {
 /// opened with the user password (the owner may do anything): signing an existing, empty
 /// signature field is filling in a form field (bit 9, or bit 6); creating a new signature
 /// field needs bits 6 and 4; certifying sets the catalog's `/Perms`, a document change (bit 4).
-/// The signature's `/Contents` stays unencrypted (`pdfcraft-cos` exempts it, §7.6.2), so the
+/// The signature's `/Contents` stays unencrypted (`pov-cos` exempts it, §7.6.2), so the
 /// placeholder can be patched after hashing exactly as in an unencrypted file.
 fn check_signing_permissions(doc: &Document, opts: &SignOptions) -> Result<(), SignError> {
     let Some(p) = doc.permissions() else { return Ok(()) };
@@ -1997,7 +1997,7 @@ fn sign_inner(
         }
     }
     let mut app = Dict::new();
-    app.set(b"Name".to_vec(), Object::name("PdfCraft"));
+    app.set(b"Name".to_vec(), Object::name("POV"));
     let mut build = Dict::new();
     build.set(b"App".to_vec(), Object::Dict(app));
     v.set(b"Prop_Build".to_vec(), Object::Dict(build));
@@ -2020,7 +2020,7 @@ fn sign_inner(
         doc.update_dict(root, |c| c.set(b"Perms".to_vec(), Object::Dict(perms)))?;
     }
     // The field and its widget.
-    let pages = pdfcraft_annot::page_refs(&doc).map_err(|e| SignError::Pdf(e.to_string()))?;
+    let pages = pov_annot::page_refs(&doc).map_err(|e| SignError::Pdf(e.to_string()))?;
     let existing = opts
         .field
         .as_deref()
@@ -2114,7 +2114,7 @@ fn sign_inner(
     doc.update_dict(widget, |w| w.set(b"AP".to_vec(), Object::Dict(apd)))?;
     // Write with the placeholders, then patch them.
     let save = SaveOptions { mod_date: Some(opts.date.clone()), object_streams: false, ..SaveOptions::default() };
-    let mut out = pdfcraft_cos::write_incremental(&doc, &save)?;
+    let mut out = pov_cos::write_incremental(&doc, &save)?;
     let (br_at, gap) = locate(&out, reserve)?;
     let (start, end) = gap;
     let ranges = [0usize, start, end, out.len() - end];
@@ -2170,13 +2170,13 @@ pub fn timestamp_document(doc: &Document, tsa: &dyn crate::timestamp::TimestampA
     v.set(b"Contents".to_vec(), Object::String(PdfString { bytes: vec![0; TOKEN_RESERVE], hex: true }));
     v.set(b"M".to_vec(), PdfString::literal(date.as_bytes().to_vec()));
     let mut app = Dict::new();
-    app.set(b"Name".to_vec(), Object::name("PdfCraft"));
+    app.set(b"Name".to_vec(), Object::name("POV"));
     let mut build = Dict::new();
     build.set(b"App".to_vec(), Object::Dict(app));
     v.set(b"Prop_Build".to_vec(), Object::Dict(build));
     doc.add(Object::Dict(v));
     let save = SaveOptions { mod_date: Some(date.to_string()), object_streams: false, ..SaveOptions::default() };
-    let mut out = pdfcraft_cos::write_incremental(&doc, &save)?;
+    let mut out = pov_cos::write_incremental(&doc, &save)?;
     let (br_at, gap) = locate(&out, TOKEN_RESERVE)?;
     let (start, end) = gap;
     let ranges = [0usize, start, end, out.len() - end];
@@ -2236,7 +2236,7 @@ pub fn display_date(pdf: &str) -> String {
 /// the name it replaces on the left is still among the details. A label that is drawn
 /// ([`AppearanceLabels`], the caller's words) must be drawable in Helvetica, and is refused otherwise.
 fn appearance(doc: &mut Document, rect: [f64; 4], name: &str, cert: &Certificate, opts: &SignOptions) -> Result<Stream, SignError> {
-    use pdfcraft_fonts::{first_undrawable, helvetica_width, inter_width, literal, undrawable_message, win_ansi, wrap, wrap_with};
+    use pov_fonts::{first_undrawable, helvetica_width, inter_width, literal, undrawable_message, win_ansi, wrap, wrap_with};
     let (w, h) = ((rect[2] - rect[0]).max(0.0), (rect[3] - rect[1]).max(0.0));
     let a = &opts.appearance;
     let dn = cert.subject.display();
@@ -2257,7 +2257,7 @@ fn appearance(doc: &mut Document, rect: [f64; 4], name: &str, cert: &Certificate
                     if matches!(c, '\n' | '\r') {
                         continue;
                     }
-                    if !pdfcraft_fonts::embedding::covers(pdfcraft_fonts::INTER_REGULAR, &c.to_string()) {
+                    if !pov_fonts::embedding::covers(pov_fonts::INTER_REGULAR, &c.to_string()) {
                         return Err(SignError::Unsupported(format!(
                             "{}; sign without a visible appearance, or leave {what} out of it",
                             undrawable_message(&format!("{what} of the visible signature"), c)
@@ -2308,14 +2308,14 @@ fn appearance(doc: &mut Document, rect: [f64; 4], name: &str, cert: &Certificate
     let mut image = None;
     let mut fonts = Dict::new();
     let (font_tag, metrics) = if needs_unicode {
-        let tag = pdfcraft_fonts::embedding::embed(doc, &mut fonts, pdfcraft_fonts::INTER_REGULAR, "Inter")
+        let tag = pov_fonts::embedding::embed(doc, &mut fonts, pov_fonts::INTER_REGULAR, "Inter")
             .map_err(|e| SignError::Pdf(format!("failed to embed signature font: {e}")))?;
         let font_dict = fonts
             .get(tag.as_bytes())
             .map(|o| doc.resolve(o))
             .and_then(|o| o.as_dict().cloned())
             .ok_or_else(|| SignError::Pdf("embedded signature font dictionary not found".into()))?;
-        let m = pdfcraft_fonts::pdf::Metrics::from_dict(doc, &font_dict);
+        let m = pov_fonts::pdf::Metrics::from_dict(doc, &font_dict);
         (tag, Some(m))
     } else {
         let mut font = Dict::new();

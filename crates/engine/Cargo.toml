@@ -1,6 +1,6 @@
 [package]
-name = "pdfcraft-engine"
-description = "PdfCraft engine façade: session, documents, command/tool catalogue"
+name = "pov-engine"
+description = "POV engine façade: session, documents, command/tool catalogue"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -10,34 +10,34 @@ workspace = true
 
 [dependencies]
 craft-docpath = { workspace = true }
-pdfcraft-measure = { workspace = true }
+pov-measure = { workspace = true }
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "tiff"] }
-pdfcraft-render = { workspace = true }
-pdfcraft-cos = { workspace = true }
-pdfcraft-organize = { workspace = true }
-pdfcraft-annot = { workspace = true }
-pdfcraft-forms = { workspace = true }
-pdfcraft-xfa = { workspace = true }
-pdfcraft-edit = { workspace = true }
-pdfcraft-audit = { workspace = true }
-pdfcraft-redact = { workspace = true }
-pdfcraft-print = { workspace = true }
-pdfcraft-xfdf = { workspace = true }
-pdfcraft-sign = { workspace = true }
-pdfcraft-optimize = { workspace = true }
-pdfcraft-a11y = { workspace = true }
-pdfcraft-ocr = { workspace = true }
-pdfcraft-js = { workspace = true }
-pdfcraft-compare = { workspace = true }
-pdfcraft-preflight = { workspace = true }
-pdfcraft-export = { workspace = true }
-pdfcraft-fonts = { workspace = true }
-pdfcraft-create = { workspace = true }
-pdfcraft-model = { workspace = true }
-pdfcraft-geom = { workspace = true }
+pov-render = { workspace = true }
+pov-cos = { workspace = true }
+pov-organize = { workspace = true }
+pov-annot = { workspace = true }
+pov-forms = { workspace = true }
+pov-xfa = { workspace = true }
+pov-edit = { workspace = true }
+pov-audit = { workspace = true }
+pov-redact = { workspace = true }
+pov-print = { workspace = true }
+pov-xfdf = { workspace = true }
+pov-sign = { workspace = true }
+pov-optimize = { workspace = true }
+pov-a11y = { workspace = true }
+pov-ocr = { workspace = true }
+pov-js = { workspace = true }
+pov-compare = { workspace = true }
+pov-preflight = { workspace = true }
+pov-export = { workspace = true }
+pov-fonts = { workspace = true }
+pov-create = { workspace = true }
+pov-model = { workspace = true }
+pov-geom = { workspace = true }
 thiserror = { workspace = true }
 png = "0.18"
-# Already in the graph (through image and pdfcraft-create): image's TiffEncoder can't set the
+# Already in the graph (through image and pov-create): image's TiffEncoder can't set the
 # resolution or the compression of an exported page.
 tiff = "0.11"
 # Already in the graph (url and idna through webbrowser, icu_properties through boa): they show
@@ -53,4 +53,4 @@ unicode-segmentation = "1.13"
 chrono = { workspace = true, features = ["clock"] }
 
 [dev-dependencies]
-pdfcraft-testkit = { workspace = true }
+pov-testkit = { workspace = true }
