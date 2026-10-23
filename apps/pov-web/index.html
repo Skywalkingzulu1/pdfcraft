@@ -9,9 +9,30 @@
       html, body { margin: 0; height: 100%; overflow: hidden; background: #f1f1f3; }
       canvas { width: 100%; height: 100%; display: block; outline: none; }
       @media (prefers-color-scheme: dark) { html, body { background: #19191c; } }
+      #pov-splash {
+        position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+        background: #19191c; z-index: 9999;
+      }
+      #pov-splash .pov-splash-spinner {
+        width: 42px; height: 42px; border-radius: 50%;
+        border: 4px solid rgba(255,255,255,0.2); border-top-color: #f1f1f3;
+        animation: pov-splash-spin 0.9s linear infinite;
+      }
+      @keyframes pov-splash-spin { to { transform: rotate(360deg); } }
+      #pov-splash .pov-splash-text { color: #f1f1f3; font: 14px/1.4 system-ui, sans-serif; margin-top: 12px; }
+      #pov-splash.pov-splash-hidden { display: none; }
     </style>
   </head>
   <body>
     <canvas id="pov"></canvas>
+    <div id="pov-splash">
+      <div class="pov-splash-spinner"></div>
+      <div class="pov-splash-text">Loading…</div>
+    </div>
+    <script>
+      function povHideSplash() { var el = document.getElementById("pov-splash"); if (el) { el.classList.add("pov-splash-hidden"); } }
+      window.addEventListener("load", povHideSplash);
+      requestAnimationFrame(function () { requestAnimationFrame(povHideSplash); });
+    </script>
   </body>
 </html>
